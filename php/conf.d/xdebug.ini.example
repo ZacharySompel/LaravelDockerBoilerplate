@@ -1,0 +1,7 @@
+; Copy to zz-xdebug.ini to enable Xdebug locally
+; zend_extension=/usr/local/lib/php/extensions/no-debug-non-zts-*/xdebug.so
+; xdebug.mode=debug
+; xdebug.start_with_request=trigger
+; xdebug.discover_client_host=1
+; xdebug.client_port=9003
+; xdebug.idekey=VSCODE

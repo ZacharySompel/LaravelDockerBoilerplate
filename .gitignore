@@ -1,0 +1,29 @@
+# Laravel specific
+/vendor/
+/node_modules/
+/public/storage
+/storage/*.key
+.env
+.env.*
+.phpunit.result.cache
+Homestead.yaml
+Homestead.json
+
+# IDE & editor files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Composer & npm cache
+composer.lock
+package-lock.json
+yarn.lock
+
+# Docker specific
+mysql-data/
+composer-cache/

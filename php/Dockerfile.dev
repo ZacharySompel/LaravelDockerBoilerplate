@@ -1,0 +1,26 @@
+# Dev image: fast iteration, optional Xdebug
+FROM php:8.3-fpm-alpine
+
+# OS packages we need for common Laravel features (GD, ZIP, INTL, etc.)
+RUN apk add --no-cache \
+    git bash curl unzip icu-dev oniguruma-dev libzip-dev \
+    libpng-dev libjpeg-turbo-dev libwebp-dev libxml2-dev
+
+# PHP extensions for Laravel
+RUN docker-php-ext-configure gd --with-jpeg --with-webp \
+ && docker-php-ext-install -j$(nproc) pdo pdo_mysql mbstring zip intl gd xml opcache
+
+# Optional Xdebug (disabled by default)
+# RUN pecl install xdebug && docker-php-ext-enable xdebug
+
+# Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www/html
+COPY conf.d/local.ini /usr/local/etc/php/conf.d/zz-local.ini
+
+# Entrypoint auto-installs Laravel into ./app if empty
+COPY entrypoint.dev.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+CMD ["/entrypoint.sh"]

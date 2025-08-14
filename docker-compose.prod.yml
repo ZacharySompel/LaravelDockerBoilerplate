@@ -1,0 +1,87 @@
+version: "3.9"
+
+services:
+  nginx:
+    image: nginx:1.26-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-laravel}-nginx
+    ports:
+      - "${PROD_HTTP_PORT:-8080}:80"
+      # For real TLS add a 443 server block and map 8443:443
+    volumes:
+      - ./app:/var/www/html
+      - ./nginx/site.prod.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      php:
+        condition: service_started
+    networks:
+      - app_net_prod
+    restart: unless-stopped
+
+  php:
+    build:
+      context: ./php
+      dockerfile: Dockerfile.prod
+    container_name: ${COMPOSE_PROJECT_NAME:-laravel}-php
+    environment:
+      TZ: ${TZ:-Australia/Melbourne}
+      AUTO_INSTALL: ${AUTO_INSTALL:-0}      # Off by default in prod
+      LARAVEL_VERSION: ${LARAVEL_VERSION:-}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-appdb}
+      MYSQL_USER: ${MYSQL_USER:-appuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-apppass}
+    volumes:
+      - ./app:/var/www/html
+      - composer-cache:/tmp/composer
+      - ./php/conf.d/local.ini:/usr/local/etc/php/conf.d/zz-local.ini:ro
+    expose:
+      - "9000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - app_net_prod
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: ${COMPOSE_PROJECT_NAME:-laravel}-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-appdb}
+      MYSQL_USER: ${MYSQL_USER:-appuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-apppass}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - app_net_prod
+    restart: unless-stopped
+
+  phpmyadmin:
+    image: phpmyadmin:5-apache
+    container_name: ${COMPOSE_PROJECT_NAME:-laravel}-phpmyadmin
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: ${MYSQL_USER:-appuser}
+      PMA_PASSWORD: ${MYSQL_PASSWORD:-apppass}
+    ports:
+      - "${PHPMYADMIN_PORT:-8081}:80"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - app_net_prod
+    restart: unless-stopped
+
+volumes:
+  composer-cache:
+  mysql-data:
+
+networks:
+  app_net_prod:
+    name: ${COMPOSE_PROJECT_NAME:-laravel}_prod_net
+    driver: bridge
