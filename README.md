@@ -1,6 +1,6 @@
 # Laravel Docker Stack (Dev + Prod-like)
 
-This repo gives you a **ready-to-run Laravel environment** using Docker.  
+This repo gives you a **ready-to-run Laravel+Statamic CMS environment** using Docker.  
 It’s designed for **local development** and can be adapted for production-like setups.  
 
 You can use it to:
@@ -36,15 +36,7 @@ cp .env.dev .env
 docker compose --env-file .env -f docker-compose.dev.yml up -d --build
 
 # 4) Initial install only — copy .env.laravel into the container (preserves APP_KEY if it already exists)
-docker compose -f docker-compose.dev.yml exec php bash -c '
-APP_ENV_FILE=/var/www/html/.env;
-if [ -f "$APP_ENV_FILE" ]; then
-  OLD_KEY=$(grep "^APP_KEY=" "$APP_ENV_FILE" || true);
-  cp .env.laravel "$APP_ENV_FILE";
-  [ -n "$OLD_KEY" ] && sed -i "s|^APP_KEY=.*|$OLD_KEY|" "$APP_ENV_FILE";
-else
-  cp .env.laravel "$APP_ENV_FILE";
-fi'
+cp .env.laravel app/.env
 
 Notes:
 - Step 4 is the **only** time you need that copy command (initial project setup).  
@@ -58,8 +50,9 @@ docker compose -f docker-compose.dev.yml exec php php artisan route:clear
 docker compose -f docker-compose.dev.yml exec php php artisan view:clear
 
 # 6) Open the app + DB admin
-# App:        http://localhost:8080
-# phpMyAdmin: http://localhost:8081
+# App:        http://localhost:8082
+# statamic:   http://localhost:8082/cp
+# phpMyAdmin: http://localhost:8083
 
 # 7) (Optional) Remove existing Git history and create your own repo
 rm -rf .git
@@ -68,8 +61,3 @@ git add .
 git commit -m "Initial commit - Laravel Docker Stack"
 
 ---
-
-**Planned variants:**  
-We may provide alternative branches for:
-- `main` – base Laravel stack (current branch)
-- `statamic` – Laravel + [Statamic CMS](https://statamic.com) preconfigured

@@ -12,11 +12,20 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
-            $table->id();
+            // Use UUID if you're migrating from file-based users, otherwise keep bigint
+            $table->id(); // change to $table->uuid('id')->primary(); if needed
+
             $table->string('name');
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
-            $table->string('password');
+            $table->string('password')->nullable(); // allow null for some Statamic imports
+
+            // Statamic-specific additions
+            $table->boolean('super')->default(false);
+            $table->string('avatar')->nullable();
+            $table->json('preferences')->nullable();
+            $table->timestamp('last_login')->nullable();
+
             $table->rememberToken();
             $table->timestamps();
         });
@@ -35,6 +44,20 @@ return new class extends Migration
             $table->longText('payload');
             $table->integer('last_activity')->index();
         });
+
+        // Pivot table for roles
+        Schema::create('role_user', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+            $table->string('role_id');
+        });
+
+        // Pivot table for groups
+        Schema::create('group_user', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+            $table->string('group_id');
+        });
     }
 
     /**
@@ -42,8 +65,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('users');
-        Schema::dropIfExists('password_reset_tokens');
+        Schema::dropIfExists('group_user');
+        Schema::dropIfExists('role_user');
         Schema::dropIfExists('sessions');
+        Schema::dropIfExists('password_reset_tokens');
+        Schema::dropIfExists('users');
     }
 };

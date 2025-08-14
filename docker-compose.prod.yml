@@ -1,7 +1,7 @@
 services:
   nginx:
     image: nginx:1.26-alpine
-    container_name: ${COMPOSE_PROJECT_NAME:-laravel}-nginx
+    container_name: ${COMPOSE_PROJECT_NAME:-statamic}-nginx
     ports:
       - "${PROD_HTTP_PORT:-8080}:80"
       # For real TLS add a 443 server block and map 8443:443
@@ -19,7 +19,7 @@ services:
     build:
       context: ./php
       dockerfile: Dockerfile.prod
-    container_name: ${COMPOSE_PROJECT_NAME:-laravel}-php
+    container_name: ${COMPOSE_PROJECT_NAME:-statamic}-php
     environment:
       TZ: ${TZ:-Australia/Melbourne}
       AUTO_INSTALL: ${AUTO_INSTALL:-0}      # Off by default in prod
@@ -42,7 +42,7 @@ services:
 
   mysql:
     image: mysql:8.0
-    container_name: ${COMPOSE_PROJECT_NAME:-laravel}-mysql
+    container_name: ${COMPOSE_PROJECT_NAME:-statamic}-mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-appdb}
@@ -61,7 +61,7 @@ services:
 
   phpmyadmin:
     image: phpmyadmin:5-apache
-    container_name: ${COMPOSE_PROJECT_NAME:-laravel}-phpmyadmin
+    container_name: ${COMPOSE_PROJECT_NAME:-statamic}-phpmyadmin
     environment:
       PMA_HOST: mysql
       PMA_USER: ${MYSQL_USER:-appuser}
@@ -81,5 +81,5 @@ volumes:
 
 networks:
   app_net_prod:
-    name: ${COMPOSE_PROJECT_NAME:-laravel}_prod_net
+    name: ${COMPOSE_PROJECT_NAME:-statamic}_prod_net
     driver: bridge
