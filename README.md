@@ -36,15 +36,7 @@ cp .env.dev .env
 docker compose --env-file .env -f docker-compose.dev.yml up -d --build
 
 # 4) Initial install only — copy .env.laravel into the container (preserves APP_KEY if it already exists)
-docker compose -f docker-compose.dev.yml exec php bash -c '
-APP_ENV_FILE=/var/www/html/.env;
-if [ -f "$APP_ENV_FILE" ]; then
-  OLD_KEY=$(grep "^APP_KEY=" "$APP_ENV_FILE" || true);
-  cp .env.laravel "$APP_ENV_FILE";
-  [ -n "$OLD_KEY" ] && sed -i "s|^APP_KEY=.*|$OLD_KEY|" "$APP_ENV_FILE";
-else
-  cp .env.laravel "$APP_ENV_FILE";
-fi'
+cp .env.laravel app/.env
 
 Notes:
 - Step 4 is the **only** time you need that copy command (initial project setup).  
