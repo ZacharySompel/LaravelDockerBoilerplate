@@ -1,6 +1,11 @@
 # Laravel Docker Stack (Dev + Prod-like)
 
-This repo gives you a **ready-to-run Laravel environment** using Docker:
+This repo gives you a **ready-to-run Laravel environment** using Docker.  
+It’s designed for **local development** and can be adapted for production-like setups.  
+
+You can use it to:
+- Quickly spin up a fresh Laravel project without installing PHP, Composer, or MySQL locally.
+- Prototype and build Laravel-based applications.
 
 - **Nginx** – serves the app
 - **PHP-FPM** – runs PHP (Laravel)
@@ -29,7 +34,6 @@ cp .env.dev .env
 
 # 3) Start the stack (builds images on first run)
 docker compose --env-file .env -f docker-compose.dev.yml up -d --build
-
 
 # 4) Initial install only — copy .env.laravel into the container (preserves APP_KEY if it already exists)
 docker compose -f docker-compose.dev.yml exec php bash -c '
@@ -62,3 +66,10 @@ rm -rf .git
 git init
 git add .
 git commit -m "Initial commit - Laravel Docker Stack"
+
+---
+
+**Planned variants:**  
+We may provide alternative branches for:
+- `main` – base Laravel stack (current branch)
+- `statamic` – Laravel + [Statamic CMS](https://statamic.com) preconfigured

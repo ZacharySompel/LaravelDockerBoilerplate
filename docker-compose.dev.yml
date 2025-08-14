@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   # Serves public/ and forwards PHP to php-fpm
   nginx:
