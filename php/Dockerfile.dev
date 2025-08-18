@@ -1,14 +1,14 @@
 # Dev image: fast iteration, optional Xdebug
 FROM php:8.3-fpm-alpine
 
-# OS packages we need for common Laravel features (GD, ZIP, INTL, etc.)
+# OS packages for common Laravel features (GD, ZIP, INTL, etc.)
 RUN apk add --no-cache \
-    git bash curl unzip icu-dev oniguruma-dev libzip-dev \
+    git curl unzip icu-dev oniguruma-dev libzip-dev \
     libpng-dev libjpeg-turbo-dev libwebp-dev libxml2-dev
 
 # PHP extensions for Laravel
 RUN docker-php-ext-configure gd --with-jpeg --with-webp \
- && docker-php-ext-install -j$(nproc) pdo pdo_mysql mbstring zip intl gd xml opcache
+ && docker-php-ext-install -j"$(nproc)" pdo pdo_mysql mbstring zip intl gd xml opcache
 
 # Optional Xdebug (disabled by default)
 # RUN pecl install xdebug && docker-php-ext-enable xdebug
@@ -16,11 +16,18 @@ RUN docker-php-ext-configure gd --with-jpeg --with-webp \
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-WORKDIR /var/www/html
+# Use /var/www so your app lives at /var/www (not /var/www/html)
+WORKDIR /var/www
+
+# Local PHP overrides
 COPY conf.d/local.ini /usr/local/etc/php/conf.d/zz-local.ini
 
-# Entrypoint auto-installs Laravel into ./app if empty
-COPY entrypoint.dev.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Entrypoint (POSIX sh). Put your script at project root: entrypoint.dev.sh
+COPY entrypoint.dev.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh \
+    # strip CRLF if the file was checked out on Windows
+    && sed -i 's/\r$//' /usr/local/bin/entrypoint.sh
 
-CMD ["/entrypoint.sh"]
+# Run the entrypoint with /usr/bin/env sh; php-fpm is the default CMD
+ENTRYPOINT ["/usr/bin/env", "sh", "/usr/local/bin/entrypoint.sh"]
+CMD ["php-fpm"]
