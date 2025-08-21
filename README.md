@@ -26,49 +26,25 @@ Stack:
 # 1) Clone this branch into a folder
 git clone https://github.com/ZacharySompel/LaravelDockerBoilerplate.git .
 cd laravel-stack   # or your folder
+git switch directus # loads up directus branch
 
-# 2) Copy the default dev env (.env drives compose vars)
+# 2) Copy the default dev env
 cp .env.dev .env
 
-# 3) Create Directus env file (secrets & DB config for Directus)
-cat > .env.directus <<'EOF'
-# Directus base
-KEY=change-me-random-32-bytes-min
-SECRET=change-me-also-32-bytes-min
-PUBLIC_URL=http://localhost:${DIRECTUS_PORT:-8055}
-
-# DB connection (to the mysql service)
-DB_CLIENT=mysql
-DB_HOST=mysql
-DB_PORT=3306
-DB_DATABASE=directus
-DB_USER=directus
-DB_PASSWORD=directuspass
-
-# Bootstrap admin (first run)
-ADMIN_EMAIL=admin@directus.local
-ADMIN_PASSWORD=admin123
-ADMIN_FIRSTNAME=Admin
-ADMIN_LASTNAME=User
-
-# Optional
-LOG_LEVEL=debug
-WEBSOCKETS_ENABLED=true
-EOF
-
-# 4) (Recommended) Ensure the Directus DB + user exist on first boot
-mkdir -p mysql/init
-cat > mysql/init/01-create-directus.sql <<'SQL'
-CREATE DATABASE IF NOT EXISTS directus
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS 'directus'@'%' IDENTIFIED BY 'directuspass';
-GRANT ALL PRIVILEGES ON directus.* TO 'directus'@'%';
-FLUSH PRIVILEGES;
-SQL
-
-# 5) Start the stack (builds images on first run)
+# 3) Start the stack (builds images on first run)
 docker compose --env-file .env -f docker-compose.dev.yml up -d --build
+
+# 4) Bootstrap Laravel (only first time)
+cp .env.laravel app/.env
+docker compose -f docker-compose.dev.yml exec php composer install
+docker compose -f docker-compose.dev.yml exec php php artisan key:generate
+docker compose -f docker-compose.dev.yml exec php php artisan migrate:fresh --seed
+
+# 5) Open apps
+# Laravel:   http://localhost:8080
+# Statamic:  http://localhost:8080/cp
+# Directus:  http://localhost:8055
+# phpMyAdmin http://localhost:8081
 
 # 6) Seed Laravel app env into the container (first install only)
 #    If you already have app/.env, you can skip this.
