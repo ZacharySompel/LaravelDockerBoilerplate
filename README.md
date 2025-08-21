@@ -1,193 +1,200 @@
-# Laravel Docker Stack (Dev + Prod‑like)
+# Laravel + Directus (Dev)
 
-This repo gives you a **ready‑to‑run Laravel environment** using Docker. It’s designed for **local development** and can be adapted for production‑like setups.
+This branch adds **Directus** to the Laravel Docker stack so you can run **Laravel (PHP)** and a **Directus headless CMS** side‑by‑side on one Docker network.
 
-## What you get
+Stack:
 
-* **Nginx** – serves the app
-* **PHP‑FPM (PHP 8.3 Alpine)** – runs Laravel
-* **MySQL 8** – database
-* **phpMyAdmin** – web GUI for the DB
+* **Nginx** → serves Laravel (`public/`)
+* **PHP-FPM** → runs Laravel
+* **MySQL 8** → databases for Laravel **and** Directus
+* **phpMyAdmin** → DB GUI
+* **Directus** → headless CMS/API ([http://localhost:8055](http://localhost:8055) by default)
 
-> No global PHP/Composer/MySQL needed on your machine.
-
----
-
-## Prerequisites
-
-* **Docker Desktop** (Windows/Mac) or **Docker Engine** (Linux)
+> No global PHP/Composer/MySQL/Node required on your machine.
 
 ---
 
-## TL;DR – Getting Started (DEV)
+## Prereqs
+
+* Docker Desktop (Mac/Windows) or Docker Engine (Linux)
+
+---
+
+## Quick Start
 
 ```bash
-# 1) Clone the repo
-git clone https://github.com/ZacharySompel/LaravelDockerBoilerplate.git laravel-stack
-cd laravel-stack
+# 1) Clone this branch into a folder
+git clone https://github.com/ZacharySompel/LaravelDockerBoilerplate.git .
+cd laravel-stack   # or your folder
 
-# 2) Copy the default dev env (used by Docker Compose)
+# 2) Copy the default dev env (.env drives compose vars)
 cp .env.dev .env
 
-# 3) Start the stack (builds images on first run)
+# 3) Create Directus env file (secrets & DB config for Directus)
+cat > .env.directus <<'EOF'
+# Directus base
+KEY=change-me-random-32-bytes-min
+SECRET=change-me-also-32-bytes-min
+PUBLIC_URL=http://localhost:${DIRECTUS_PORT:-8055}
+
+# DB connection (to the mysql service)
+DB_CLIENT=mysql
+DB_HOST=mysql
+DB_PORT=3306
+DB_DATABASE=directus
+DB_USER=directus
+DB_PASSWORD=directuspass
+
+# Bootstrap admin (first run)
+ADMIN_EMAIL=admin@directus.local
+ADMIN_PASSWORD=admin123
+ADMIN_FIRSTNAME=Admin
+ADMIN_LASTNAME=User
+
+# Optional
+LOG_LEVEL=debug
+WEBSOCKETS_ENABLED=true
+EOF
+
+# 4) (Recommended) Ensure the Directus DB + user exist on first boot
+mkdir -p mysql/init
+cat > mysql/init/01-create-directus.sql <<'SQL'
+CREATE DATABASE IF NOT EXISTS directus
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'directus'@'%' IDENTIFIED BY 'directuspass';
+GRANT ALL PRIVILEGES ON directus.* TO 'directus'@'%';
+FLUSH PRIVILEGES;
+SQL
+
+# 5) Start the stack (builds images on first run)
 docker compose --env-file .env -f docker-compose.dev.yml up -d --build
 
-# 4) First run: ensure the app exists
-# If ./app is empty, the container auto‑scaffolds Laravel (AUTO_INSTALL=1).
-# If you prefer manual install or auto‑scaffold didn’t run:
-docker compose -f docker-compose.dev.yml exec php sh -lc '
-  cd /var/www/html &&
-  [ -f artisan ] || composer create-project laravel/laravel . --no-interaction &&
-  composer install --no-interaction --prefer-dist &&
-  php artisan key:generate --ansi
-'
+# 6) Seed Laravel app env into the container (first install only)
+#    If you already have app/.env, you can skip this.
+[ -f app/.env ] || cp .env.laravel app/.env
 
-# 5) Clear caches (good hygiene)
-docker compose -f docker-compose.dev.yml exec php php artisan config:clear
-docker compose -f docker-compose.dev.yml exec php php artisan cache:clear
-docker compose -f docker-compose.dev.yml exec php php artisan route:clear
-docker compose -f docker-compose.dev.yml exec php php artisan view:clear
-
-# 6) Open the app + DB admin
-# App:        http://localhost:8080
-# phpMyAdmin: http://localhost:8081
-
-# 7) (Optional) start a fresh git history
-rm -rf .git && git init && git add . && git commit -m "Initial commit - Laravel Docker Stack"
+# 7) Generate Laravel app key & run migrations (inside the php container)
+docker compose -f docker-compose.dev.yml exec php php artisan key:generate --ansi
+# Optional: set up a fresh DB for Laravel
+# docker compose -f docker-compose.dev.yml exec php php artisan migrate:fresh --seed
 ```
 
-**Windows PowerShell equivalents**
+Open:
 
-```powershell
-Copy-Item .env.dev .env
-# If you want to pre-seed Laravel’s .env on first run:
-Copy-Item .env.laravel .\app\.env
+* Laravel app → [http://localhost:8080](http://localhost:8080)  (or your `DEV_HTTP_PORT`)
+* Directus → [http://localhost:8055](http://localhost:8055)
+* phpMyAdmin → [http://localhost:8081](http://localhost:8081)
+
+On the first Directus visit, sign in with `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `.env.directus`.
+
+---
+
+## Environment Files
+
+* **`.env`** → used by Docker Compose (project name, ports, DB root creds).
+* **`.env.laravel`** → copied to `app/.env` for Laravel runtime configuration.
+* **`.env.directus`** → used by the Directus container for its runtime config.
+
+**Important:** Do **not** commit `.env*` files. Add these to `.gitignore`.
+
+Example `.gitignore` additions:
+
+```
+.env
+.env.dev
+.env.laravel
+.env.directus
+app/.env
+mysql-data/
+directus-uploads/
+directus-extensions/
 ```
 
 ---
 
-## Notes & Troubleshooting (Windows/macOS/Linux)
+## Directus Notes
 
-### Cross‑platform entrypoint (no Bash required)
+* The SQL in `mysql/init/01-create-directus.sql` only runs the **first time** the MySQL volume is created. If you already have data, either:
 
-* The PHP image is **Alpine** and ships **/bin/sh**, not bash. The dev image uses a POSIX **sh** entrypoint so it works everywhere.
+  * Create DB & user manually via phpMyAdmin, **or**
+  * Temporarily exec into MySQL and run the same SQL:
 
-### Common errors & quick fixes
+    ```bash
+    docker compose exec mysql mysql -uroot -p$MYSQL_ROOT_PASSWORD -e "
+      CREATE DATABASE IF NOT EXISTS directus CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+      CREATE USER IF NOT EXISTS 'directus'@'%' IDENTIFIED BY 'directuspass';
+      GRANT ALL PRIVILEGES ON directus.* TO 'directus'@'%';
+      FLUSH PRIVILEGES;"
+    ```
 
-**1) `.env: can't execute 'bash'`**
-
-* **Cause:** a script tries to run `bash` on Alpine, or CRLF broke the interpreter line.
-* **Fix:** the dev Dockerfile runs the entrypoint with `sh` and strips CRLF during build. If you kept a bash shebang, either install bash (`apk add --no-cache bash`) or switch to `sh`.
-
-**2) `Could not open input file: artisan`**
-
-* **Cause:** you’re not in the directory that contains `artisan`, or Laravel wasn’t installed.
-* **Fix:**
-
-  ```bash
-  docker compose -f docker-compose.dev.yml exec php sh -lc 'cd /var/www/html && php artisan --version'
-  ```
-
-  If missing, install into the **same** path mounted by Compose:
+* If you change `.env.directus`, restart Directus:
 
   ```bash
-  docker compose -f docker-compose.dev.yml exec php sh -lc '
-    cd /var/www/html &&
-    composer create-project laravel/laravel . --no-interaction &&
-    php artisan key:generate --ansi
-  '
+  docker compose restart directus
   ```
 
-**3) `failed opening required '/var/www/html/vendor/autoload.php'`**
+* Default Directus uploads/extensions are persisted in named volumes:
 
-* **Cause:** `vendor/` doesn’t exist (Composer never ran in `/var/www/html`) or path mismatch.
-* **Fix:**
+  * `directus-uploads`
+  * `directus-extensions`
 
-  ```bash
-  docker compose -f docker-compose.dev.yml exec php sh -lc '
-    cd /var/www/html && composer install --no-interaction --prefer-dist
-  '
-  ```
+---
 
-**4) Infinite “waiting for .env / missing env” loop**
+## Common Troubleshooting
 
-* **Cause:** wrong mount path or CRLF broke the entrypoint.
-* **Fix:** ensure **everywhere** uses `/var/www/html` (Dockerfile `WORKDIR`, entrypoint `APP_DIR`, Compose volume/`working_dir`). Normalize line endings.
+### Directus: `ER_ACCESS_DENIED_ERROR` for user 'directus'@
 
-**5) “It looks like vendor isn’t mounted”**
+Cause: DB user/database missing or wrong password.
+Fix:
 
-* This stack **does not** overlay‑mount `vendor/` by default. If you want faster Windows I/O, you may opt‑in to a named volume:
+1. Verify `.env.directus` matches your MySQL creds.
+2. Ensure `directus` DB and user exist (see SQL above).
+3. Restart Directus: `docker compose restart directus`.
 
-  ```yaml
-  services:
-    php:
-      volumes:
-        - ./app:/var/www/html
-        - vendor:/var/www/html/vendor
-  volumes:
-    vendor:
-  ```
+### Laravel: "Could not open input file: artisan"
 
-  Then populate it **inside** the container:
-
-  ```bash
-  docker compose -f docker-compose.dev.yml exec php sh -lc 'cd /var/www/html && composer install'
-  ```
-
-### Verify paths (quick diagnostics)
+Cause: Composer deps not installed yet.
+Fix:
 
 ```bash
-docker compose -f docker-compose.dev.yml logs php --tail=200
+docker compose -f docker-compose.dev.yml exec php sh -lc 'cd /var/www/html && composer install'
+```
 
-docker compose -f docker-compose.dev.yml exec php sh -lc 'pwd; ls -la /var/www /var/www/html'
+### 502 from Nginx
 
-docker compose -f docker-compose.dev.yml exec php sh -lc 'test -f /var/www/html/composer.json && echo has-composer.json || echo no-composer.json'
+* Ensure `php` container is healthy and exposed on port 9000.
+* Check `nginx/site.dev.conf` `fastcgi_pass php:9000;` matches the service name `php`.
+
+---
+
+## Ports & Variables (defaults)
+
+* App (Nginx) → `${DEV_HTTP_PORT:-8080}`
+* phpMyAdmin → `${PHPMYADMIN_PORT:-8081}`
+* Directus → `${DIRECTUS_PORT:-8055}`
+
+You can change these in `.env`.
+
+---
+
+## Optional: Make Your Own Repo
+
+```bash
+rm -rf .git
+git init
+git add .
+git commit -m "Initial commit - Laravel + Directus stack"
+# git remote add origin <your-ssh-or-https-url>
+# git push -u origin main
 ```
 
 ---
 
-## Dev PHP Dockerfile (cross‑platform)
+## Production-ish Notes (very high level)
 
-The dev Dockerfile is already **cross‑platform** (uses `sh`) and strips CRLF on the entrypoint during build:
-
-```dockerfile
-# Dev image: fast iteration, optional Xdebug
-FROM php:8.3-fpm-alpine
-
-# OS packages for common Laravel features (GD, ZIP, INTL, etc.)
-RUN apk add --no-cache \
-    git curl unzip icu-dev oniguruma-dev libzip-dev \
-    libpng-dev libjpeg-turbo-dev libwebp-dev libxml2-dev
-
-# PHP extensions for Laravel
-RUN docker-php-ext-configure gd --with-jpeg --with-webp \
- && docker-php-ext-install -j"$(nproc)" pdo pdo_mysql mbstring zip intl gd xml opcache
-
-# Optional Xdebug (disabled by default)
-# RUN pecl install xdebug && docker-php-ext-enable xdebug
-
-# Composer
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-
-WORKDIR /var/www/html
-
-# Local PHP overrides
-COPY conf.d/local.ini /usr/local/etc/php/conf.d/zz-local.ini
-
-# Entrypoint: POSIX sh + strip CRLF
-COPY entrypoint.dev.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh \
- && sed -i 's/\r$//' /usr/local/bin/entrypoint.sh
-
-ENTRYPOINT ["/usr/bin/env", "sh", "/usr/local/bin/entrypoint.sh"]
-CMD ["php-fpm"]
-```
-
-> If you keep a Bash‑specific entrypoint, add `apk add --no-cache bash` and change the entrypoint to `bash`. Using `sh` is simpler and avoids platform issues.
-
----
-
-## Planned variants
-
-* `main` – base Laravel stack (current branch)
-* `statamic` – Laravel + \[Statam
+* Run Directus and Laravel behind a real reverse proxy (Nginx/Traefik) with TLS.
+* Use managed DB (RDS/Aurora/Cloud SQL) or durable volumes.
+* Configure backups for DB and `/directus/uploads`.
+* Set strong random `KEY` and `SECRET` in `.env.directus`.
+* Lock down phpMyAdmin to dev only (don’t expose it in prod).

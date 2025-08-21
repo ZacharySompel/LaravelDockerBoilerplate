@@ -1,12 +1,12 @@
 services:
-  # Serves public/ and forwards PHP to php-fpm
+  # Serves Laravel public/ and forwards PHP to php-fpm
   nginx:
     image: nginx:1.26-alpine
-    container_name: ${COMPOSE_PROJECT_NAME:-laravel}-nginx
+    container_name: ${COMPOSE_PROJECT_NAME:-directus}-nginx
     ports:
       - "${DEV_HTTP_PORT:-8080}:80"     # Visit http://localhost:8080
     volumes:
-      - ./app:/var/www/html            # Share code into container
+      - ./app:/var/www/html
       - ./nginx/site.dev.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       php:
@@ -20,11 +20,11 @@ services:
     build:
       context: ./php
       dockerfile: Dockerfile.dev
-    container_name: ${COMPOSE_PROJECT_NAME:-laravel}-php
+    container_name: ${COMPOSE_PROJECT_NAME:-directus}-php
     environment:
       TZ: ${TZ:-Australia/Melbourne}
-      AUTO_INSTALL: ${AUTO_INSTALL:-1}       # 1 = auto-install when ./app is empty
-      LARAVEL_VERSION: ${LARAVEL_VERSION:-}  # optional (e.g. ^11.0)
+      AUTO_INSTALL: ${AUTO_INSTALL:-1}
+      LARAVEL_VERSION: ${LARAVEL_VERSION:-}
       # DB vars passed so entrypoint can write app/.env on first run
       MYSQL_DATABASE: ${MYSQL_DATABASE:-appdb}
       MYSQL_USER: ${MYSQL_USER:-appuser}
@@ -32,7 +32,7 @@ services:
       DEV_HTTP_PORT: ${DEV_HTTP_PORT:-8080}
     volumes:
       - ./app:/var/www/html
-      - composer-cache:/tmp/composer        # Speeds up composer installs
+      - composer-cache:/tmp/composer
       - ./php/conf.d/local.ini:/usr/local/etc/php/conf.d/zz-local.ini:ro
       # Optional Xdebug — rename & uncomment to enable
       # - ./php/conf.d/xdebug.ini.example:/usr/local/etc/php/conf.d/zz-xdebug.ini:ro
@@ -45,17 +45,19 @@ services:
       - app_net_dev
     restart: unless-stopped
 
-  # MySQL database
+  # MySQL database (hosts BOTH Laravel DB and Directus DB)
   mysql:
     image: mysql:8.0
-    container_name: ${COMPOSE_PROJECT_NAME:-laravel}-mysql
+    container_name: ${COMPOSE_PROJECT_NAME:-directus}-mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-appdb}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-appdb}    # Laravel's DB created automatically
       MYSQL_USER: ${MYSQL_USER:-appuser}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-apppass}
     volumes:
       - mysql-data:/var/lib/mysql
+      # Init script creates a SECOND DB + user for Directus on first run
+      - ./mysql/init/01-create-directus.sql:/docker-entrypoint-initdb.d/01-create-directus.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
       interval: 5s
@@ -68,13 +70,13 @@ services:
   # Web DB GUI for MySQL — use when you don't have Navicat etc.
   phpmyadmin:
     image: phpmyadmin:5-apache
-    container_name: ${COMPOSE_PROJECT_NAME:-laravel}-phpmyadmin
+    container_name: ${COMPOSE_PROJECT_NAME:-directus}-phpmyadmin
     environment:
-      PMA_HOST: mysql            # Service name of MySQL above
+      PMA_HOST: mysql
       PMA_USER: ${MYSQL_USER:-appuser}
       PMA_PASSWORD: ${MYSQL_PASSWORD:-apppass}
     ports:
-      - "${PHPMYADMIN_PORT:-8081}:80"  # Visit http://localhost:8081
+      - "${PHPMYADMIN_PORT:-8081}:80"      # Visit http://localhost:8081
     depends_on:
       mysql:
         condition: service_healthy
@@ -82,11 +84,31 @@ services:
       - app_net_dev
     restart: unless-stopped
 
+  # Directus (Headless CMS/API) — dev convenience: expose 8055
+  directus:
+    image: directus/directus:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-directus}-directus
+    env_file:
+      - ./.env.directus      # keep Directus secrets out of compose file
+    ports:
+      - "${DIRECTUS_PORT:-8055}:8055"      # Visit http://localhost:8055
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - directus-uploads:/directus/uploads
+      - directus-extensions:/directus/extensions
+    networks:
+      - app_net_dev
+    restart: unless-stopped
+
 volumes:
   composer-cache:
   mysql-data:
+  directus-uploads:
+  directus-extensions:
 
 networks:
   app_net_dev:
-    name: ${COMPOSE_PROJECT_NAME:-laravel}_dev_net
+    name: ${COMPOSE_PROJECT_NAME:-directus}_dev_net
     driver: bridge
