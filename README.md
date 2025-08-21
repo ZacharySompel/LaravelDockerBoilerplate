@@ -26,7 +26,7 @@ No global PHP/Composer/MySQL needed on your machine.
 
 ```bash
 # 1) Clone the repo
-git clone https://github.com/ZacharySompel/LaravelDockerBoilerplate.git laravel-stack
+git clone https://github.com/ZacharySompel/LaravelDockerBoilerplate.git .
 cd laravel-stack
 
 # 2) Copy the default dev env (used by Docker Compose)
@@ -44,10 +44,35 @@ Notes:
 
 # 5) Ensure APP_KEY exists and clear caches
 docker compose -f docker-compose.dev.yml exec php php artisan key:generate --ansi
-docker compose -f docker-compose.dev.yml exec php php artisan config:clear
-docker compose -f docker-compose.dev.yml exec php php artisan cache:clear
-docker compose -f docker-compose.dev.yml exec php php artisan route:clear
-docker compose -f docker-compose.dev.yml exec php php artisan view:clear
+
+# --- Troubleshooting ---
+# If you see: "Could not open input file: artisan"
+# it means Laravel dependencies haven’t been installed yet.
+# Run the following to fix:
+
+# 5.1. Enter the PHP container:
+docker compose -f docker-compose.dev.yml exec php sh
+
+# 5.2. Go to the app directory:
+cd /var/www/html
+
+# 5.3. Install dependencies:
+composer install
+
+# 5.4. Run database migrations and seeders:
+php artisan migrate:fresh --seed
+
+# 5.5. Generate app key and clear caches:
+php artisan key:generate
+php artisan config:clear
+php artisan cache:clear
+php artisan route:clear
+php artisan view:clear
+
+# 5.6. (Optional) Create your first Statamic user:
+php please make:user
+# If prompted to enable Statamic Pro, type "yes or no depending on your projects needs".
+## Note Ctrl+D exits out of the container.
 
 # 6) Open the app + DB admin
 # App:        http://localhost:8082
