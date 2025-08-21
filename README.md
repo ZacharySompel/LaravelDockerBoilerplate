@@ -28,6 +28,7 @@ No global PHP/Composer/MySQL needed on your machine.
 # 1) Clone the repo
 git clone https://github.com/ZacharySompel/LaravelDockerBoilerplate.git .
 cd laravel-stack
+git switch statamic
 
 # 2) Copy the default dev env (used by Docker Compose)
 cp .env.dev .env
