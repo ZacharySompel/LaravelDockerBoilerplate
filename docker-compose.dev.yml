@@ -48,6 +48,8 @@ services:
   # MySQL database (hosts BOTH Laravel DB and Directus DB)
   mysql:
     image: mysql:8.0
+    ports:
+      - "3306:3306"
     container_name: ${COMPOSE_PROJECT_NAME:-directus}-mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
