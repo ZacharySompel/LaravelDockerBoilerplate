@@ -7,13 +7,21 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "doctrine/dbal": "^4.3",
         "http-interop/http-factory-guzzle": "^1.2",
         "laravel/framework": "^12.0",
+        "laravel/sanctum": "^4.0",
         "laravel/scout": "^10.19",
         "laravel/tinker": "^2.10.1",
-        "meilisearch/meilisearch-php": "^1.16"
+        "meilisearch/meilisearch-php": "^1.16",
+        "predis/predis": "^3.2",
+        "spatie/laravel-activitylog": "^4.10",
+        "spatie/laravel-permission": "^6.21",
+        "spatie/laravel-sitemap": "^7.3"
     },
     "require-dev": {
+        "barryvdh/laravel-debugbar": "^3.16",
+        "barryvdh/laravel-ide-helper": "^3.6",
         "fakerphp/faker": "^1.23",
         "laravel/pail": "^1.2.2",
         "laravel/pint": "^1.13",

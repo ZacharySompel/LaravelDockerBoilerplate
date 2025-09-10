@@ -91,7 +91,7 @@ services:
     image: directus/directus:latest
     container_name: ${COMPOSE_PROJECT_NAME:-directus}-directus
     env_file:
-      - ./.env.directus      # keep Directus secrets out of compose file
+      - ./.env.meilisearch      # keep Directus secrets out of compose file
     ports:
       - "${DIRECTUS_PORT:-8055}:8055"      # Visit http://localhost:8055
     depends_on:
@@ -121,12 +121,26 @@ services:
       - app_net_dev
     restart: unless-stopped
 
+  # REDIS FOR CACHE
+  redis:
+    image: redis:7-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-directus}-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - app_net_dev
+    restart: unless-stopped
+
 volumes:
   composer-cache:
   mysql-data:
   directus-uploads:
   directus-extensions:
   meili-data:
+  redis-data:
 
 networks:
   app_net_dev:
